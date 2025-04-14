@@ -1,0 +1,77 @@
+#include <DHT.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+// Constants
+#define DHTPIN 2
+#define DHTTYPE DHT11
+#define BUZZER_PIN 8
+#define TEMP_THRESHOLD 30.0
+
+// Modules
+DHT dht(DHTPIN, DHTTYPE);
+LiquidCrystal_I2C lcd(0x27, 16, 2);  // Use 0x3F if your LCD has that address
+
+void setup() {
+  Serial.begin(9600);
+  dht.begin();
+  
+  lcd.init();
+  lcd.backlight();
+  
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);  // Make sure buzzer is off
+
+  // Splash screen
+  lcd.setCursor(0, 0);
+  lcd.print("Weather Station");
+  lcd.setCursor(0, 1);
+  lcd.print("Initializing...");
+  delay(2000);
+  lcd.clear();
+}
+
+void loop() {
+  float temp = dht.readTemperature();
+  float hum = dht.readHumidity();
+
+  // Sensor error check
+  if (isnan(temp) || isnan(hum)) {
+    lcd.setCursor(0, 0);
+    lcd.print("Sensor Error     ");
+    lcd.setCursor(0, 1);
+    lcd.print("Check wiring     ");
+    Serial.println("Sensor error");
+    delay(2000);
+    return;
+  }
+
+  // Send to serial (for Python/ThingSpeak)
+  Serial.print(temp);
+  Serial.print(",");
+  Serial.println(hum);
+
+  // Show temperature
+  lcd.setCursor(0, 0);
+  lcd.print("Temp: ");
+  lcd.print(temp, 1);
+  lcd.print((char)223);
+  lcd.print("C   ");  // Padding
+
+  // Check threshold
+  if (temp > TEMP_THRESHOLD) {
+    lcd.setCursor(0, 1);
+    lcd.print("Temp > 30C ALERT ");
+    digitalWrite(BUZZER_PIN, HIGH);
+  } else {
+    lcd.setCursor(0, 1);
+    lcd.print("Humidity: ");
+    lcd.print(hum, 1);
+    lcd.print("%   ");  // Padding
+    digitalWrite(BUZZER_PIN, LOW);  // ✅ Ensures buzzer is OFF
+  }
+
+  delay(15000);  // Wait before next reading
+}
+
+
