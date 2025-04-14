@@ -1,0 +1,50 @@
+import serial
+import requests
+import time
+from datetime import datetime
+
+# ThingSpeak settings
+API_KEY = 'OJDBEXB2FQC8K7I6'  
+BASE_URL = f'https://api.thingspeak.com/update?api_key={API_KEY}'
+
+# Serial Port Configuration
+try:
+    ser = serial.Serial('COM6', 9600, timeout=5) 
+    print(f"[{datetime.now()}] ✅ Serial connection established on COM3")
+except Exception as e:
+    print(f"[{datetime.now()}] ❌ Failed to connect to serial port: {e}")
+    exit()
+
+def log_status(message, status="INFO"):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{now}] [{status}] {message}")
+
+while True:
+    try:
+        raw_line = ser.readline().decode('utf-8').strip()
+
+        if "," in raw_line:
+            temp, hum = raw_line.split(",")
+            temp = temp.strip()
+            hum = hum.strip()
+
+            log_status(f"📡 Received Sensor Data → Temperature: {temp}°C | Humidity: {hum}%")
+
+            # Prepare ThingSpeak request
+            response = requests.get(BASE_URL + f"&field1={temp}&field2={hum}")
+
+            if response.status_code == 200:
+                log_status("📤 Data successfully sent to ThingSpeak ✅")
+            else:
+                log_status(f"⚠️ ThingSpeak upload failed with status code: {response.status_code}", "WARNING")
+        else:
+            log_status("⛔ Invalid data format received. Waiting for valid sensor input...", "WARNING")
+
+    except requests.exceptions.RequestException as req_err:
+        log_status(f"🔌 Network error: {req_err}", "ERROR")
+    except ValueError as ve:
+        log_status(f"❗ Value parsing error: {ve}", "ERROR")
+    except Exception as e:
+        log_status(f"❗ Unexpected error: {e}", "ERROR")
+
+    time.sleep(15)
